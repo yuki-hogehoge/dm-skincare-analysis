@@ -39,6 +39,7 @@ full detail below.
 ├── analysis_A_ingredient_rank/
 │   ├── analysis_A_ingredient_rank_vs_price.ipynb
 │   └── figures/
+│       ├── fig1_scatter_all.png
 │       ├── fig2_glycerin.png
 │       └── fig3_forest_all9.png
 ├── analysis_B_fragrance_rating/       # coming soon
@@ -84,21 +85,6 @@ correlation.
 
 See the [Zenn article (Japanese)](https://zenn.dev/yuki_hogehoge/articles/dm_serum_analysis_ingredient_rank)
 and the notebook itself for full details.
-
-## Files
-
-```
-analysis_A_ingredient_rank/
-├── analysis_A_ingredient_rank_vs_price.ipynb   # Main analysis notebook
-└── figures/
-    ├── fig2_glycerin.png     # The spurious glycerin correlation (illustrating the confound)
-    └── fig3_forest_all9.png  # Forest plot summarizing all 9 ingredients
-```
-
-> `fig1_scatter_all.png` (the scatter-plot grid) is not included in this repository,
-> since it can only be regenerated with the actual dataset. Running Step 5 of the
-> notebook will produce it under the same filename — please add your own copy to
-> `figures/fig1_scatter_all.png` after running it.
 
 ## How to Run
 
