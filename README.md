@@ -18,7 +18,7 @@ This project is split across three repositories.
 
 | | Question | Status | Conclusion (short) | Notebook | Article |
 |---|---|---|---|---|---|
-| A | Do higher-priced products list active ingredients higher on the ingredient panel? | ✅ Done | Not supported for any of the 9 ingredients tested | [analysis_A/](./analysis_A_ingredient_rank/analysis_A_ingredient_rank_vs_price.ipynb) | [Zenn (JP)](https://zenn.dev/yuki_hogehoge/articles/dm_serum_analysis_ingredient_rank) |
+| A | Do higher-priced products list active ingredients higher on the ingredient panel? | ✅ Done | Not supported for 8/9 ingredients; Vitamin C shows a brand-dependent exception (see note below) | [analysis_A/](./analysis_A_ingredient_rank/analysis_A_ingredient_rank_vs_price.ipynb) | [Zenn (JP)](https://zenn.dev/yuki_hogehoge/articles/dm_serum_analysis_ingredient_rank) |
 | B | Does the presence of fragrance / denatured alcohol relate to rating? | 🔜 Planned | — | — | — |
 | C | How does ingredient placement compare between private-label and national brands? | 🔜 Planned | — | — | — |
 | D | How does ingredient count relate to price? | 🟡 Partially covered in A | Weak positive correlation (rho = 0.34) | See Step 7 in Analysis A | — |
@@ -86,6 +86,18 @@ correlation.
 See the [Zenn article (Japanese)](https://zenn.dev/yuki_hogehoge/articles/dm_serum_analysis_ingredient_rank)
 and the notebook itself for full details.
 
+### Supplementary check: price per 100ml
+
+Repeating the analysis with price converted to price-per-100ml (instead of the raw
+listed price) left the main conclusion unchanged for 8 of the 9 ingredients. Vitamin C
+was the exception: it showed a statistically significant negative correlation
+(rho = -0.37, 95% CI [-0.62, -0.03], brand-cluster bootstrap) that held up after
+removing a single outlier product, but weakened to non-significance (p = 0.08) once
+L'Oréal-family products (9 of 40) were excluded. This result is therefore reported as
+suggestive rather than conclusive — it looks more like a brand-specific pricing
+strategy than an industry-wide pattern. See Step 13 in the notebook for the full
+sensitivity analysis.
+
 ## How to Run
 
 ```bash
@@ -113,6 +125,7 @@ cells from top to bottom reproduces every result in this analysis.
 | 10 | Brand-level cluster bootstrap |
 | 11 | Summary figure (forest plot) |
 | 12 | Conclusions and limitations |
+| 13 | Supplementary check: price per 100ml |
 
 ## Statistical Methods
 
@@ -127,7 +140,7 @@ subsequent analyses (B, C, D, etc.).
 
 ## Limitations
 
-- Price does not account for product volume (ml) — this is not a price-per-100ml comparison.
+- ~~Price does not account for product volume (ml) — this is not a price-per-100ml comparison.~~
 - Ingredient rank is an imperfect proxy for concentration: under EU labeling rules,
   ingredients below 1% concentration may be listed in any order.
 - The dataset covers 171 dm.de products at a single point in time; findings do not
