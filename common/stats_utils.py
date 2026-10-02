@@ -7,11 +7,14 @@ dm-skincare-analysis で使う共通統計関数。
 
 使い方:
     from common.stats_utils import boot_spearman, partial_spearman, cluster_boot
+
+分析Bで追加:
+    from common.stats_utils import auc_xy, make_auc_func, bayes_avg, run_test
 """
 
 import numpy as np
 import pandas as pd
-from scipy.stats import spearmanr
+from scipy.stats import spearmanr, mannwhitneyu, rankdata
 
 
 def boot_spearman(x, y, rng=None, n_boot=5000):
@@ -122,3 +125,119 @@ def cluster_boot(d, func, brand_col="brand", price_col="price_eur_clean", rng=No
         except Exception:
             continue
     return tuple(np.nanpercentile(np.array(vals), [2.5, 97.5]))
+
+
+# ---------------------------------------------------------------------------
+# 分析Bで追加(2群比較・ベイズ平均)
+# ---------------------------------------------------------------------------
+
+def auc_xy(x, y):
+    """
+    共通言語効果量(AUC): xから1件、yから1件ランダムに選んだとき、
+    xのほうが高い確率。同値は0.5件分として数える。
+
+    Mann-Whitney U検定の U / (n1 * n2) と同じ値。順位の合計から計算するのは、
+    scipyのバージョンによって U がどちらの群の値で返るかが違うのを避けるため。
+    0.5なら差なし。目安(慣例)は 0.56 小 / 0.64 中 / 0.71 大。
+
+    Parameters
+    ----------
+    x, y : array-like
+        比較する2群の値(x = 「あり」群、y = 「なし」群 など)。
+
+    Returns
+    -------
+    float
+        0〜1のAUC。
+    """
+    x = np.asarray(x, dtype=float)
+    y = np.asarray(y, dtype=float)
+    ranks = rankdata(np.concatenate([x, y]))  # 全体での順位(同値は平均順位)
+    n1, n2 = len(x), len(y)
+    return (ranks[:n1].sum() - n1 * (n1 + 1) / 2) / (n1 * n2)
+
+
+def make_auc_func(flag_col, value_col, min_group=3):
+    """
+    `cluster_boot` に渡すための関数を作る。
+
+    cluster_boot は `func(dataframe) -> float` の形でしか呼べないので、
+    比較する列名を内側に閉じ込めた関数を返す。
+
+    Parameters
+    ----------
+    flag_col : str
+        0/1のグループ列(1 = 「あり」群)。
+    value_col : str
+        比較する値の列。
+    min_group : int
+        選び直した結果どちらかの群がこの件数未満になったら NaN を返して捨てる。
+
+    Returns
+    -------
+    callable
+        `f(dataframe) -> float`(AUC、または群が小さすぎれば NaN)。
+    """
+    def f(dd):
+        x = dd.loc[dd[flag_col] == 1, value_col]
+        y = dd.loc[dd[flag_col] == 0, value_col]
+        if len(x) < min_group or len(y) < min_group:
+            return np.nan
+        return auc_xy(x, y)
+    return f
+
+
+def bayes_avg(r, n, m, C):
+    """
+    ベイズ平均(縮小推定): (C*m + n*r) / (C + n)
+
+    レビュー数nが少ない商品の評価rを、全体の代表値mに引き寄せる。
+    Cは「mの評価が最初からC件付いている」とみなす仮想レビュー数(縮小の強さ)。
+
+    注意: mを平均にするか中央値にするかで結果が変わる。ratingは天井効果で
+    中央値 > 平均になりやすく、mを平均にすると、レビュー数の少ない普通の商品が
+    実際より下に引かれ、rating_countとの人工的な正の相関ができることがある
+    (分析Bで確認)。mの取り方は必ず感度チェックすること。
+    """
+    return (C * m + n * r) / (C + n)
+
+
+def run_test(data, flag_col, value_col, label, brand_col="brand",
+             n_boot=2000, seed=42):
+    """
+    Mann-Whitney U検定(両側)+ AUC + ブランド単位クラスタ・ブートストラップCI。
+
+    Parameters
+    ----------
+    data : pandas.DataFrame
+    flag_col : str
+        0/1のグループ列(1 = 「あり」群)。
+    value_col : str
+        比較する値の列(例: ベイズ平均)。
+    label : str
+        結果表に出す比較の名前。
+    brand_col : str
+        クラスタ(ブランド)列。表記ゆれを統一した列を渡すこと
+        (統一が不完全だとCIが実態より狭くなる)。
+    n_boot, seed : int
+        ブートストラップ回数と乱数シード(再現性のため固定)。
+
+    Returns
+    -------
+    dict
+        n、中央値、AUC、CI、p値を含む1行ぶんの結果。
+    """
+    x = data.loc[data[flag_col] == 1, value_col]
+    y = data.loc[data[flag_col] == 0, value_col]
+    p = mannwhitneyu(x, y, alternative="two-sided").pvalue
+    rng = np.random.default_rng(seed)
+    # price_col は cluster_boot の「全値同一を弾く」チェック用だが、AUCでは
+    # make_auc_func 側の NaN ガードで足りるので、比較対象の列を渡して無害化する。
+    lo, hi = cluster_boot(data, make_auc_func(flag_col, value_col),
+                          brand_col=brand_col, price_col=value_col,
+                          rng=rng, n_boot=n_boot)
+    return {"比較": label, "指標": value_col,
+            "n_あり": len(x), "n_なし": len(y),
+            "median_あり": round(x.median(), 3), "median_なし": round(y.median(), 3),
+            "AUC": round(auc_xy(x, y), 3),
+            "CI_low": round(lo, 3), "CI_high": round(hi, 3), "p": round(p, 4)}
