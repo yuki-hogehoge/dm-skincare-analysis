@@ -19,7 +19,7 @@ This project is split across three repositories.
 | | Question | Status | Conclusion (short) | Notebook | Article |
 |---|---|---|---|---|---|
 | A | Do higher-priced products list active ingredients higher on the ingredient panel? | ✅ Done | Not supported for 8/9 ingredients; Vitamin C shows a brand-dependent exception (see note below) | [analysis_A/](./analysis_A_ingredient_rank/analysis_A_ingredient_rank_vs_price.ipynb) | [Zenn (JP)](https://zenn.dev/yuki_hogehoge/articles/dm_serum_analysis_ingredient_rank) |
-| B | Does the presence of fragrance / denatured alcohol relate to rating? | ✅ Done |No evidence for fragrance; alcohol looks higher-rated but the gap disappears within brands (see note below) | [analysis_B/](./analysis_B_fragrance_alcohol_rating/analysis_B_fragrance_alcohol_rating.ipynb | — |
+| B | Does the presence of fragrance / denatured alcohol relate to rating? | ✅ Done |No evidence for fragrance; alcohol looks higher-rated but the gap disappears within brands (see note below) | [analysis_B/](./analysis_B_fragrance_alcohol_rating/analysis_B_fragrance_alcohol_rating.ipynb) | — |
 | C | How does ingredient placement compare between private-label and national brands? | 🔜 Planned | — | — | — |
 | D | How does ingredient count relate to price? | 🟡 Partially covered in A | Weak positive correlation (rho = 0.34) | See Step 7 in Analysis A | — |
 | concern | Automated extraction of marketing "concerns" (e.g. anti-aging, sensitive skin) from product descriptions | 🔜 Planned | — | — | — |
