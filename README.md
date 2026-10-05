@@ -19,7 +19,7 @@ This project is split across three repositories.
 | | Question | Status | Conclusion (short) | Notebook | Article |
 |---|---|---|---|---|---|
 | A | Do higher-priced products list active ingredients higher on the ingredient panel? | ✅ Done | Not supported for 8/9 ingredients; Vitamin C shows a brand-dependent exception (see note below) | [analysis_A/](./analysis_A_ingredient_rank/analysis_A_ingredient_rank_vs_price.ipynb) | [Zenn (JP)](https://zenn.dev/yuki_hogehoge/articles/dm_serum_analysis_ingredient_rank) |
-| B | Does the presence of fragrance / denatured alcohol relate to rating? | 🔜 Planned | — | — | — |
+| B | Does the presence of fragrance / denatured alcohol relate to rating? | ✅ Done |No evidence for fragrance; alcohol looks higher-rated but the gap disappears within brands (see note below) | [analysis_B/](./analysis_B_fragrance_alcohol_rating/analysis_B_fragrance_alcohol_rating.ipynb | — |
 | C | How does ingredient placement compare between private-label and national brands? | 🔜 Planned | — | — | — |
 | D | How does ingredient count relate to price? | 🟡 Partially covered in A | Weak positive correlation (rho = 0.34) | See Step 7 in Analysis A | — |
 | concern | Automated extraction of marketing "concerns" (e.g. anti-aging, sensitive skin) from product descriptions | 🔜 Planned | — | — | — |
@@ -35,6 +35,7 @@ full detail below.
 ├── README.md
 ├── requirements.txt
 ├── common/
+│   ├── __init__.py            # empty file
 │   └── stats_utils.py                # Shared helpers: boot_spearman, cluster_boot, partial_spearman
 ├── analysis_A_ingredient_rank/
 │   ├── analysis_A_ingredient_rank_vs_price.ipynb
@@ -42,7 +43,8 @@ full detail below.
 │       ├── fig1_scatter_all.png
 │       ├── fig2_glycerin.png
 │       └── fig3_forest_all9.png
-├── analysis_B_fragrance_rating/       # coming soon
+├── analysis_B_fragrance_rating/
+│       └── analysis_B_fragrance_alcohol_rating.ipynb
 ├── analysis_C_private_label/          # coming soon
 ├── analysis_D_ingredient_count_price/ # coming soon
 └── concern_extraction/                # coming soon
@@ -147,6 +149,52 @@ subsequent analyses (B, C, D, etc.).
   generalize to the broader market or other time periods.
 - The partial correlation is a simplified version that removes the linear effect of
   ingredient count; nonlinear confounding may remain.
+
+# Analysis B: Fragrance / alcohol denat. vs. user rating
+
+**Question:** Do serums containing fragrance (Parfum) or alcohol denat. get different user ratings than serums without them?
+
+**Notebook:** `analysis_B_fragrance_alcohol_rating.ipynb`
+
+### Summary
+
+- **Fragrance:** no association with rating in any setting we tried (main analysis AUC 0.556, 95% CI [0.42, 0.69]; within-brand AUC 0.521). We found *no evidence of a difference*, which is not the same as evidence of no difference: the CIs are wide.
+- **Alcohol denat.:** a naive comparison shows alcohol-containing products rated slightly *higher* (AUC 0.57-0.66). This does not hold up as an effect of the ingredient itself:
+  - the lower CI bound sits right at 0.5 and moves across it depending on the bootstrap seed and the settings;
+  - 29 of the 34 alcohol products come from just five brands (L'ORÉAL PARiS 11, WELEDA 6, NIVEA 5, lavera 4, GARNIER 3);
+  - excluding the three largest of these brands (L'ORÉAL PARiS, NIVEA, WELEDA) gives AUC 0.542, and comparing products within the same brand gives AUC 0.443, with the CI crossing 0.5 in both cases;
+  - adding products listing bare `alcohol` to the definition weakens the result (AUC 0.570).
+  The most natural explanation is that large-brand products tend to have more reviews and higher ratings, but this data cannot confirm it.
+- These are associations, not causal effects. The alcohol group is small (34 products) and the within-brand comparison effectively rests on four brands, so absence of evidence here is weak.
+
+### Method
+
+| Step | What we did |
+|---|---|
+| Outcome | Bayesian-average rating (shrinkage toward a prior mean, using `rating_count`), main setting C = 30 |
+| Test | Mann-Whitney U (two-sided), with the common-language effect size AUC = P(a random "with" product is rated higher than a random "without" product); 0.5 means no difference |
+| Uncertainty | 95% CI from a brand-level cluster bootstrap (products from the same brand are not independent) |
+| Decision rule (fixed before looking at results) | α = 0.025 (two main tests); claim evidence only if p < 0.025 **and** the CI excludes 0.5; if p and CI disagree, trust the CI |
+| Robustness | C ∈ {5, 10, 30, 90}; prior mean = mean vs. median; leave out Balea; leave out the three largest alcohol brands; raw rating for products with ≥ 30 reviews; alternative flag definitions; within-brand comparison; different bootstrap seeds |
+
+### Data handling
+
+- **Analysis sample: 167 of 172 products.**
+  - 4 products with `rating_count == 0` are excluded (their `rating_value` is stored as 0.0, not missing, and would otherwise count as the lowest rating);
+  - 1 product with `ingredients_multi_variant_flag == True` is excluded (the ingredient list mixes several variants; same product excluded in Analysis A).
+- **Alcohol flag fixed.** `alcohol_denat_present` missed five products whose ingredient lists write the name with a footnote marker (`alcohol* denat`, `alcohol¹ denat`) or use the alias `SD Alcohol 40-B`. The notebook builds a corrected flag (`alcohol_v2`) by stripping footnote markers; alcohol products go from 29 to 34. The original column is kept untouched.
+- **Alternative definitions used only as robustness checks:** `alcohol_v3` (also counts bare `alcohol`, 42 products) and `fragrance_alt` (4 products with no Parfum but with EU-labelled fragrance allergens counted as fragrance, 76 products).
+- **Brand names unified** for the cluster bootstrap (e.g. `Balea med` → `Balea`, `Garnier Skin Active` → `GARNIER`, `alverde Naturschön` → `alverde NATURKOSMETIK`, `L'ORÉAL PARiS REVITALIFT` → `L'ORÉAL PARiS`): 47 → 43 brands. `Diaderma` and `Diadermine` are different companies and are kept separate.
+- **Overlap of the two flags:** 33 of the 34 alcohol products also contain fragrance, so "alcohol vs. no alcohol" partly mixes in fragrance. Alcohol-only (1 product) cannot be analysed separately.
+- **Analysis A impact check:** none of the ingredients used in Analysis A (niacinamide, glycerin, hyaluronic acid, retinol/retinal, vitamin C, tocopherol) appear with footnote markers in the ingredient lists, so the alcohol-flag issue does not carry over. This check looks only for marker-suffixed spellings; it does not compare every `*_present` flag against the raw lists.
+- `private_label` is missing for 137 of 167 products (it only exists for the 30 manually annotated ones) and was not used.
+
+### Methodological notes
+
+1. **The prior mean in the Bayesian average matters.** Using the mean rating (4.39) as the shrinkage target created an artificial positive correlation between `rating_count` and the shrunk rating (Spearman +0.180, p = 0.020), because ratings are ceiling-skewed (median 4.49). Using the median removes it (+0.072, p = 0.354). The raw rating itself has no such correlation (-0.061). The main analysis keeps the mean (as pre-specified); the median version is reported as a robustness check.
+2. **A small p-value was not enough.** The main alcohol test gave p = 0.010 but did not survive brand-level CIs or within-brand comparison.
+3. **Validate flags before testing.** Checking the detection logic found the five missed alcohol products.
+4. We ran 20+ comparisons in total, so individual p-values in the robustness section should be treated as exploratory. For example, fragrance after excluding Balea gave AUC 0.621 (p = 0.014), but this vanishes in the within-brand comparison.
 
 ## License
 
